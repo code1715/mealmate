@@ -1,14 +1,30 @@
 services:
-  postgres:
+  postgres-auth:
     image: postgres:18.3
     environment:
       POSTGRES_USER: mealmate
       POSTGRES_PASSWORD: mealmate
-      POSTGRES_DB: mealmate
+      POSTGRES_DB: auth
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_auth_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mealmate"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-orders:
+    image: postgres:18.3
+    environment:
+      POSTGRES_USER: mealmate
+      POSTGRES_PASSWORD: mealmate
+      POSTGRES_DB: orders
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_orders_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U mealmate"]
       interval: 10s
@@ -149,8 +165,11 @@ services:
       dockerfile: docker/Dockerfile.auth
     ports:
       - "8001:8000"
+    environment:
+      POSTGRES_URL: postgresql+asyncpg://mealmate:mealmate@postgres-auth:5432/auth
+      REDIS_URL: redis://redis:6379/0
     depends_on:
-      postgres:
+      postgres-auth:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -171,8 +190,11 @@ services:
       dockerfile: docker/Dockerfile.order
     ports:
       - "8002:8000"
+    environment:
+      POSTGRES_URL: postgresql+asyncpg://mealmate:mealmate@postgres-orders:5432/orders
+      REDIS_URL: redis://redis:6379/0
     depends_on:
-      postgres:
+      postgres-orders:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -250,7 +272,8 @@ services:
       start_period: 15s
 
 volumes:
-  postgres_data:
+  postgres_auth_data:
+  postgres_orders_data:
   mongo1_data:
   mongo2_data:
   mongo3_data:
