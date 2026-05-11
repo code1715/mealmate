@@ -1,14 +1,15 @@
-import enum
+"""Pydantic domain models for the Auth Service.
+
+These are the in-memory representations used by the business logic layer.
+They are independent of the database ORM model.
+"""
+
 import uuid
 from datetime import datetime
 
 from pydantic import BaseModel
 
-
-class UserRole(str, enum.Enum):
-    customer = "customer"
-    courier = "courier"
-    restaurant = "restaurant"
+from app.models.user import UserRole
 
 
 class User(BaseModel):

@@ -4,8 +4,10 @@ All database interactions go through this module.
 No business logic lives here — only CRUD operations.
 """
 
-from app.models.domain import UserRole
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.user import User, UserRole
 
 
 class UserRepository:
@@ -15,9 +17,31 @@ class UserRepository:
         self.db = db
 
     async def find_by_email(self, email: str) -> dict | None:
-        # Will be implemented with SQLAlchemy queries in issue #15
-        raise NotImplementedError
+        stmt = select(User).where(User.email == email)
+        result = await self.db.execute(stmt)
+        user = result.scalar_one_or_none()
+        if user is None:
+            return None
+        return {
+            "id": user.id,
+            "email": user.email,
+            "hashed_password": user.hashed_password,
+            "role": user.role.value if user.role else None,
+            "created_at": user.created_at,
+        }
 
     async def create(self, email: str, hashed_password: str, role: UserRole) -> dict:
-        # Will be implemented with SQLAlchemy queries in issue #15
-        raise NotImplementedError
+        user = User(
+            email=email,
+            hashed_password=hashed_password,
+            role=role,
+        )
+        self.db.add(user)
+        await self.db.flush()
+        await self.db.refresh(user)
+        return {
+            "id": user.id,
+            "email": user.email,
+            "role": user.role.value if user.role else None,
+            "created_at": user.created_at,
+        }

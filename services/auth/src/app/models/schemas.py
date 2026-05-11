@@ -1,8 +1,9 @@
 import uuid
 from datetime import datetime
 
-from app.models.domain import UserRole
 from pydantic import BaseModel, EmailStr, Field
+
+from app.models.user import UserRole
 
 # --- Request schemas ---
 

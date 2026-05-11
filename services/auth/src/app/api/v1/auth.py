@@ -5,6 +5,9 @@ calling the service layer, and formatting responses.
 No business logic or database calls belong here.
 """
 
+from fastapi import APIRouter, Depends, Header, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.dependencies import get_db, get_redis
 from app.models.schemas import (
     LoginRequest,
@@ -17,8 +20,6 @@ from app.models.schemas import (
 from app.repositories.token_repository import TokenRepository
 from app.repositories.user_repository import UserRepository
 from app.services.auth_service import AuthService
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter()
 
@@ -30,6 +31,11 @@ def get_auth_service(
     user_repo = UserRepository(db)
     token_repo = TokenRepository(redis)
     return AuthService(user_repo=user_repo, token_repo=token_repo)
+
+
+def extract_token(authorization: str) -> str:
+    """Extract Bearer token from the Authorization header."""
+    return authorization.removeprefix("Bearer ").strip()
 
 
 @router.post(
@@ -61,10 +67,10 @@ async def login(body: LoginRequest, service: AuthService = Depends(get_auth_serv
 
 @router.post("/logout", response_model=MessageResponse)
 async def logout(
-    authorization: str = "",
+    authorization: str = Header(default=""),
     service: AuthService = Depends(get_auth_service),
 ):
-    token = authorization.removeprefix("Bearer ").strip()
+    token = extract_token(authorization)
     if token:
         await service.logout(token)
     return MessageResponse(message="Logged out")
@@ -72,9 +78,10 @@ async def logout(
 
 @router.get("/validate", response_model=ValidateResponse)
 async def validate(
-    authorization: str = "", service: AuthService = Depends(get_auth_service)
+    authorization: str = Header(default=""),
+    service: AuthService = Depends(get_auth_service),
 ):
-    token = authorization.removeprefix("Bearer ").strip()
+    token = extract_token(authorization)
     if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing token"
