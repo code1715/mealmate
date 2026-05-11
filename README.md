@@ -1,5 +1,7 @@
 # MealMate
 
+[![CI](https://github.com/code1715/mealmate/actions/workflows/ci.yml/badge.svg)](https://github.com/code1715/mealmate/actions/workflows/ci.yml)
+
 MealMate is a scalable, highly available food delivery platform designed to seamlessly connect customers, local restaurants, and couriers.
 
 ## Services
