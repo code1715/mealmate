@@ -5,7 +5,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
     # Postgres
-    postgres_url: str = "postgresql+asyncpg://mealmate:mealmate@postgres:5432/mealmate"
+    postgres_url: str = "postgresql+asyncpg://mealmate:mealmate@postgres-auth:5432/auth"
 
     # Redis
     redis_url: str = "redis://redis:6379/0"
