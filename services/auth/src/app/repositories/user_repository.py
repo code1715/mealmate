@@ -1,47 +1,37 @@
-"""User Repository — Data access layer for Postgres.
-
-All database interactions go through this module.
-No business logic lives here — only CRUD operations.
-"""
-
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.user import User, UserRole
+from app.models.domain import User, UserRole
+from app.models.user import User as UserORM
 
 
 class UserRepository:
-    """Manages user persistence in Postgres."""
-
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def find_by_email(self, email: str) -> dict | None:
-        stmt = select(User).where(User.email == email)
+    async def find_by_email(self, email: str) -> User | None:
+        stmt = select(UserORM).where(UserORM.email == email)
         result = await self.db.execute(stmt)
-        user = result.scalar_one_or_none()
-        if user is None:
+        row = result.scalar_one_or_none()
+        if row is None:
             return None
-        return {
-            "id": user.id,
-            "email": user.email,
-            "hashed_password": user.hashed_password,
-            "role": user.role.value if user.role else None,
-            "created_at": user.created_at,
-        }
-
-    async def create(self, email: str, hashed_password: str, role: UserRole) -> dict:
-        user = User(
-            email=email,
-            hashed_password=hashed_password,
-            role=role,
+        return User(
+            id=row.id,
+            email=row.email,
+            role=row.role,
+            hashed_password=row.hashed_password,
+            created_at=row.created_at,
         )
-        self.db.add(user)
+
+    async def create(self, email: str, hashed_password: str, role: UserRole) -> User:
+        row = UserORM(email=email, hashed_password=hashed_password, role=role)
+        self.db.add(row)
         await self.db.flush()
-        await self.db.refresh(user)
-        return {
-            "id": user.id,
-            "email": user.email,
-            "role": user.role.value if user.role else None,
-            "created_at": user.created_at,
-        }
+        await self.db.refresh(row)
+        return User(
+            id=row.id,
+            email=row.email,
+            role=row.role,
+            hashed_password=row.hashed_password,
+            created_at=row.created_at,
+        )
