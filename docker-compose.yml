@@ -35,6 +35,11 @@ services:
       - "27018:27017"
     volumes:
       - mongo2_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   mongo3:
     image: mongo:8.3.1
@@ -43,23 +48,25 @@ services:
       - "27019:27017"
     volumes:
       - mongo3_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   mongo-init:
     image: mongo:8.3.1
     depends_on:
       mongo1:
         condition: service_healthy
+      mongo2:
+        condition: service_healthy
+      mongo3:
+        condition: service_healthy
     restart: "no"
-    entrypoint: >
-      mongosh --host mongo1 --eval
-      "rs.initiate({
-        _id: 'rs0',
-        members: [
-          { _id: 0, host: 'mongo1:27017' },
-          { _id: 1, host: 'mongo2:27017' },
-          { _id: 2, host: 'mongo3:27017' }
-        ]
-      })"
+    volumes:
+      - ./docker/mongo-init.sh:/mongo-init.sh:ro
+    entrypoint: ["bash", "/mongo-init.sh"]
 
   redis:
     image: redis:8.6.3
