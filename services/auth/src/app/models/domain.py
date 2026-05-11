@@ -1,23 +1,19 @@
-"""Pydantic domain models for the Auth Service.
-
-These are the in-memory representations used by the business logic layer.
-They are independent of the database ORM model.
-"""
-
 import uuid
+from dataclasses import dataclass
 from datetime import datetime
-
-from pydantic import BaseModel
-
-from app.models.user import UserRole
+from enum import Enum
 
 
-class User(BaseModel):
-    """Domain model representing an authenticated user."""
+class UserRole(str, Enum):
+    customer = "customer"
+    courier = "courier"
+    restaurant = "restaurant"
 
+
+@dataclass
+class User:
     id: uuid.UUID
     email: str
     role: UserRole
+    hashed_password: str
     created_at: datetime
-
-    model_config = {"from_attributes": True}

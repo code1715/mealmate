@@ -3,7 +3,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, EmailStr, Field
 
-from app.models.user import UserRole
+from app.models.domain import UserRole
 
 # --- Request schemas ---
 

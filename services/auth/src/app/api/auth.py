@@ -1,10 +1,3 @@
-"""Auth route handlers — Web layer.
-
-These handlers deal only with HTTP concerns: parsing requests,
-calling the service layer, and formatting responses.
-No business logic or database calls belong here.
-"""
-
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,29 +21,23 @@ def get_auth_service(
     db: AsyncSession = Depends(get_db),
     redis=Depends(get_redis),
 ) -> AuthService:
-    user_repo = UserRepository(db)
-    token_repo = TokenRepository(redis)
-    return AuthService(user_repo=user_repo, token_repo=token_repo)
+    return AuthService(
+        user_repo=UserRepository(db),
+        token_repo=TokenRepository(redis),
+    )
 
 
 def extract_token(authorization: str) -> str:
-    """Extract Bearer token from the Authorization header."""
     return authorization.removeprefix("Bearer ").strip()
 
 
-@router.post(
-    "/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED
-)
-async def register(
-    body: RegisterRequest, service: AuthService = Depends(get_auth_service)
-):
+@router.post("/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
+async def register(body: RegisterRequest, service: AuthService = Depends(get_auth_service)):
     try:
-        user = await service.register(
-            email=body.email, password=body.password, role=body.role
-        )
+        user = await service.register(email=body.email, password=body.password, role=body.role)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
-    return user
+    return RegisterResponse(id=user.id, email=user.email, role=user.role)
 
 
 @router.post("/login", response_model=LoginResponse)
@@ -58,10 +45,7 @@ async def login(body: LoginRequest, service: AuthService = Depends(get_auth_serv
     try:
         token = await service.login(email=body.email, password=body.password)
     except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials",
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
     return LoginResponse(access_token=token)
 
 
@@ -83,9 +67,7 @@ async def validate(
 ):
     token = extract_token(authorization)
     if not token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing token"
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing token")
     try:
         data = await service.validate_token(token)
     except ValueError as e:

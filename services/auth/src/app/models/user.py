@@ -1,18 +1,11 @@
-"""SQLAlchemy ORM model for the users table."""
-
 import datetime
-import enum
 import uuid
 
 from sqlalchemy import Column, DateTime, Enum, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import DeclarativeBase
 
-
-class UserRole(str, enum.Enum):
-    customer = "customer"
-    courier = "courier"
-    restaurant = "restaurant"
+from app.models.domain import UserRole
 
 
 class Base(DeclarativeBase):

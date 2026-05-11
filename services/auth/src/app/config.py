@@ -9,7 +9,6 @@ class Settings(BaseSettings):
 
     # Redis
     redis_url: str = "redis://redis:6379/0"
-    redis_token_ttl: int = 3600  # seconds
 
     # JWT
     jwt_secret: str = "change-me-in-production"
