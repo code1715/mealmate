@@ -137,6 +137,62 @@ services:
       timeout: 10s
       retries: 5
 
+  auth:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.auth
+    ports:
+      - "8001:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  order:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.order
+    ports:
+      - "8002:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+
+  restaurant:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.restaurant
+    ports:
+      - "8003:8000"
+    depends_on:
+      mongo1:
+        condition: service_healthy
+
+  routing:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.routing
+    ports:
+      - "8004:8000"
+    depends_on:
+      neo4j:
+        condition: service_healthy
+
+  notification:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.notification
+    ports:
+      - "8005:8000"
+    depends_on:
+      kafka:
+        condition: service_healthy
+
 volumes:
   postgres_data:
   mongo1_data:
