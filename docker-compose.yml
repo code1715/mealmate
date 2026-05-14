@@ -173,8 +173,8 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.auth
-    ports:
-      - "8001:8000"
+    expose:
+      - "8000"
     environment:
       POSTGRES_URL: postgresql+asyncpg://mealmate:mealmate@postgres-auth:5432/auth
       REDIS_URL: redis://redis:6379/0
@@ -198,8 +198,8 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.order
-    ports:
-      - "8002:8000"
+    expose:
+      - "8000"
     environment:
       POSTGRES_URL: postgresql+asyncpg://mealmate:mealmate@postgres-orders:5432/orders
       REDIS_URL: redis://redis:6379/0
@@ -226,8 +226,8 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.order
-    ports:
-      - "8006:8000"
+    expose:
+      - "8000"
     environment:
       POSTGRES_URL: postgresql+asyncpg://mealmate:mealmate@postgres-orders:5432/orders
       REDIS_URL: redis://redis:6379/0
@@ -263,6 +263,12 @@ services:
         condition: service_healthy
       order-2:
         condition: service_healthy
+      restaurant:
+        condition: service_healthy
+      routing:
+        condition: service_healthy
+      notification:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost/health || exit 1"]
       interval: 10s
@@ -273,8 +279,8 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.restaurant
-    ports:
-      - "8003:8000"
+    expose:
+      - "8000"
     depends_on:
       mongo1:
         condition: service_healthy
@@ -293,8 +299,8 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.routing
-    ports:
-      - "8004:8000"
+    expose:
+      - "8000"
     depends_on:
       neo4j:
         condition: service_healthy
@@ -313,8 +319,8 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.notification
-    ports:
-      - "8005:8000"
+    expose:
+      - "8000"
     depends_on:
       kafka:
         condition: service_healthy

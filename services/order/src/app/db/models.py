@@ -19,7 +19,11 @@ class Order(Base):
     customer_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     restaurant_id = Column(UUID(as_uuid=True), nullable=False)
     courier_id = Column(UUID(as_uuid=True), nullable=True)
-    status = Column(Enum(OrderStatus), default=OrderStatus.PLACED, nullable=False)
+    # create_type=False: we create the enum ourselves in main.py to avoid
+    # a race condition between two instances starting at the same time
+    status = Column(
+        Enum(OrderStatus, create_type=False), default=OrderStatus.PLACED, nullable=False
+    )
     total_price = Column(Float, nullable=False)
     created_at = Column(
         DateTime(timezone=True), default=datetime.datetime.now(datetime.timezone.utc)

@@ -11,8 +11,6 @@ set -euo pipefail
 
 # --- Config ---
 GATEWAY="http://localhost"
-ORDER_1_DIRECT="http://localhost:8002"
-ORDER_2_DIRECT="http://localhost:8006"
 RESTAURANT_ID="550e8400-e29b-41d4-a716-446655440001"
 TEST_EMAIL="failover-${RANDOM}@test.com"
 
@@ -71,11 +69,8 @@ wait_healthy "order"; wait_healthy "order-2"
 # =========================================================================
 log "1. Verify both instances are healthy"
 # =========================================================================
-get "$ORDER_1_DIRECT/health"
-[[ $(rc) == "200" ]] && pass "order-1 healthy" || fail "order-1 unhealthy (HTTP $(rc))"
-
-get "$ORDER_2_DIRECT/health"
-[[ $(rc) == "200" ]] && pass "order-2 healthy" || fail "order-2 unhealthy (HTTP $(rc))"
+get "$GATEWAY/health/order"
+[[ $(rc) == "200" ]] && pass "order backend healthy" || fail "order backend unhealthy (HTTP $(rc))"
 
 # =========================================================================
 log "2. Register, login, create order"
@@ -123,6 +118,13 @@ post "$GATEWAY/api/orders" \
 get "$GATEWAY/api/orders" "$TOKEN"
 [[ $(rc) == "200" ]] && pass "JWT still valid after kill (shared Redis)" \
                       || fail "JWT rejected (HTTP $(rc))"
+
+# =========================================================================
+log "5. Cleanup — restart order-1"
+# =========================================================================
+docker start "$ORDER1" >/dev/null 2>/dev/null || true
+wait_healthy "order"
+pass "order-1 restarted"
 
 # =========================================================================
 # Results

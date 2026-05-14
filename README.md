@@ -18,18 +18,20 @@
 | Restaurant catalog | MongoDB (3-node Replica Set) |
 | Courier graph | Neo4j |
 | Event streaming | Kafka + Zookeeper |
-| API Gateway | Nginx (planned) |
+| API Gateway | Nginx |
 | Containerization | Docker + Docker Compose |
 
 ## Services
 
-| Service | Port | Description |
+All services are accessed through the API Gateway on port **80**.
+
+| Service | Route prefix | Description |
 |---|---|---|
-| Auth | 8001 | Registration, login/logout, JWT validation |
-| Order | 8002 | Order lifecycle and status management |
-| Restaurant | 8003 | Restaurant catalog and menus |
-| Routing | 8004 | Courier matching via graph queries |
-| Notification | 8005 | Async push notifications (Kafka consumer) |
+| Auth | `/api/auth/` | Registration, login/logout, JWT validation |
+| Order | `/api/orders/` | Order lifecycle and status management (2 instances) |
+| Restaurant | `/api/restaurants/` | Restaurant catalog and menus |
+| Routing | `/api/routing/` | Courier matching via graph queries |
+| Notification | Kafka consumer | Async push notifications |
 
 ## Prerequisites
 
@@ -55,10 +57,14 @@ To run only infrastructure (databases, Kafka, Redis) without application service
 docker compose up postgres-auth postgres-orders mongo1 mongo2 mongo3 redis kafka neo4j
 ```
 
-## Infrastructure Ports
+## Ports
+
+All application traffic goes through the API Gateway on port **80**.
+Infrastructure services are exposed for debugging:
 
 | Service | Host port |
 |---|---|
+| API Gateway | 80 |
 | Auth Postgres | 5432 |
 | Orders Postgres | 5433 |
 | MongoDB primary | 27017 |
@@ -84,7 +90,7 @@ services/
   restaurant/    # FastAPI — MongoDB
   routing/       # FastAPI — Neo4j
   notification/  # FastAPI — Kafka consumer
-api-gateway/     # Nginx config (planned)
+api-gateway/     # Nginx config
 docker/          # Dockerfiles and init scripts
 docs/            # Architecture diagram, use cases, API contracts
 ```
