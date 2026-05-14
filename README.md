@@ -23,13 +23,15 @@
 
 ## Services
 
-| Service | Port | Description |
+All services are accessed through the API Gateway on port **80**.
+
+| Service | Route prefix | Description |
 |---|---|---|
-| Auth | 8001 | Registration, login/logout, JWT validation |
-| Order | 8002 | Order lifecycle and status management |
-| Restaurant | 8003 | Restaurant catalog and menus |
-| Routing | 8004 | Courier matching via graph queries |
-| Notification | 8005 | Async push notifications (Kafka consumer) |
+| Auth | `/api/auth/` | Registration, login/logout, JWT validation |
+| Order | `/api/orders/` | Order lifecycle and status management (2 instances) |
+| Restaurant | `/api/restaurants/` | Restaurant catalog and menus |
+| Routing | `/api/routing/` | Courier matching via graph queries |
+| Notification | Kafka consumer | Async push notifications |
 
 ## Prerequisites
 
