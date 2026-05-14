@@ -11,3 +11,6 @@ class RestaurantService:
 
     async def get_restaurant(self, restaurant_id: str) -> Restaurant | None:
         return await self._repo.find_by_id(restaurant_id)
+
+    async def create_restaurant(self, name: str, address: str, cuisine: str, rating: float) -> Restaurant:
+        return await self._repo.create(name, address, cuisine, rating)

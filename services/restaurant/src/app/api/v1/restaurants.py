@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.db.mongo import get_db
 from app.models.menu_item import MenuItemResponse
-from app.models.restaurant import RestaurantListResponse, RestaurantResponse
+from app.models.restaurant import RestaurantCreate, RestaurantListResponse, RestaurantResponse
 from app.repositories.menu_repo import MenuRepository
 from app.repositories.restaurant_repo import RestaurantRepository
 from app.services.menu_service import MenuService
@@ -31,6 +31,20 @@ async def list_restaurants(service: RestaurantService = Depends(get_restaurant_s
             for r in items
         ],
         total=len(items),
+    )
+
+
+@router.post("/", response_model=RestaurantResponse, status_code=status.HTTP_201_CREATED)
+async def create_restaurant(
+    body: RestaurantCreate,
+    service: RestaurantService = Depends(get_restaurant_service),
+):
+    restaurant = await service.create_restaurant(
+        name=body.name, address=body.address, cuisine=body.cuisine, rating=body.rating
+    )
+    return RestaurantResponse(
+        id=restaurant.id, name=restaurant.name, address=restaurant.address,
+        cuisine=restaurant.cuisine, rating=restaurant.rating, is_active=restaurant.is_active,
     )
 
 

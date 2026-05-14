@@ -89,3 +89,70 @@ async def test_list_restaurants_returns_data(sample_restaurant):
     assert data["items"][0]["name"] == "Burger Palace"
     assert data["items"][0]["cuisine"] == "American"
     assert data["items"][0]["rating"] == 4.5
+
+
+@pytest.mark.anyio
+async def test_create_restaurant_returns_201(sample_restaurant):
+    from app.main import app
+    from app.api.v1.restaurants import get_restaurant_service
+
+    mock_service = AsyncMock()
+    mock_service.create_restaurant = AsyncMock(return_value=sample_restaurant)
+
+    app.dependency_overrides[get_restaurant_service] = lambda: mock_service
+    try:
+        with patch("app.db.mongo.connect", new_callable=AsyncMock), \
+             patch("app.db.mongo.disconnect", new_callable=AsyncMock):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                response = await client.post(
+                    "/api/v1/restaurants/",
+                    json={"name": "Burger Palace", "address": "10 Main St", "cuisine": "American", "rating": 4.5},
+                )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 201
+    data = response.json()
+    assert data["name"] == "Burger Palace"
+    assert data["is_active"] is True
+    assert "id" in data
+
+
+@pytest.mark.anyio
+async def test_create_restaurant_rejects_missing_fields():
+    from app.main import app
+    from app.api.v1.restaurants import get_restaurant_service
+
+    app.dependency_overrides[get_restaurant_service] = lambda: AsyncMock()
+    try:
+        with patch("app.db.mongo.connect", new_callable=AsyncMock), \
+             patch("app.db.mongo.disconnect", new_callable=AsyncMock):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                response = await client.post(
+                    "/api/v1/restaurants/",
+                    json={"name": "Incomplete"},
+                )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 422
+
+
+@pytest.mark.anyio
+async def test_create_restaurant_rejects_invalid_rating():
+    from app.main import app
+    from app.api.v1.restaurants import get_restaurant_service
+
+    app.dependency_overrides[get_restaurant_service] = lambda: AsyncMock()
+    try:
+        with patch("app.db.mongo.connect", new_callable=AsyncMock), \
+             patch("app.db.mongo.disconnect", new_callable=AsyncMock):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                response = await client.post(
+                    "/api/v1/restaurants/",
+                    json={"name": "Bad", "address": "1 St", "cuisine": "Any", "rating": 10.0},
+                )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 422

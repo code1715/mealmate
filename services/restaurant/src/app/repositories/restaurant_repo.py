@@ -19,6 +19,18 @@ class RestaurantRepository:
             return None
         return self._to_domain(doc) if doc else None
 
+    async def create(self, name: str, address: str, cuisine: str, rating: float) -> Restaurant:
+        doc = {
+            "name": name,
+            "address": address,
+            "cuisine": cuisine,
+            "rating": rating,
+            "is_active": True,
+        }
+        result = await self._col.insert_one(doc)
+        doc["_id"] = result.inserted_id
+        return self._to_domain(doc)
+
     def _to_domain(self, doc: dict) -> Restaurant:
         return Restaurant(
             id=str(doc["_id"]),
