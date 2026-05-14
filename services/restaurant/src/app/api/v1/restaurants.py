@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.db.mongo import get_db
-from app.models.menu_item import MenuItemResponse
+from app.dependencies.auth import require_restaurant_role
+from app.models.menu_item import MenuItemCreate, MenuItemResponse
 from app.models.restaurant import RestaurantCreate, RestaurantListResponse, RestaurantResponse
 from app.repositories.menu_repo import MenuRepository
 from app.repositories.restaurant_repo import RestaurantRepository
@@ -59,6 +60,24 @@ async def get_restaurant(
     return RestaurantResponse(
         id=restaurant.id, name=restaurant.name, address=restaurant.address,
         cuisine=restaurant.cuisine, rating=restaurant.rating, is_active=restaurant.is_active,
+    )
+
+
+@router.post("/{restaurant_id}/menu", response_model=MenuItemResponse, status_code=status.HTTP_201_CREATED)
+async def add_menu_item(
+    restaurant_id: str,
+    body: MenuItemCreate,
+    restaurant_service: RestaurantService = Depends(get_restaurant_service),
+    menu_service: MenuService = Depends(get_menu_service),
+    _: dict = Depends(require_restaurant_role),
+):
+    restaurant = await restaurant_service.get_restaurant(restaurant_id)
+    if not restaurant:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Restaurant not found")
+    item = await menu_service.add_item(restaurant_id, body.name, body.description, body.price)
+    return MenuItemResponse(
+        id=item.id, restaurant_id=item.restaurant_id, name=item.name,
+        description=item.description, price=item.price, is_available=item.is_available,
     )
 
 
