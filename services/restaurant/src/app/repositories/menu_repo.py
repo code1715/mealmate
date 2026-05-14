@@ -1,6 +1,8 @@
+import pymongo.errors
 from bson import ObjectId
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
+from app.exceptions import WriteUnavailableError
 from app.models.domain import MenuItem
 
 
@@ -20,7 +22,10 @@ class MenuRepository:
             "price": price,
             "is_available": True,
         }
-        result = await self._col.insert_one(doc)
+        try:
+            result = await self._col.insert_one(doc)
+        except pymongo.errors.PyMongoError as exc:
+            raise WriteUnavailableError(str(exc)) from exc
         doc["_id"] = result.inserted_id
         return self._to_domain(doc)
 
@@ -29,11 +34,14 @@ class MenuRepository:
             oid = ObjectId(item_id)
         except Exception:
             return None
-        result = await self._col.find_one_and_update(
-            {"_id": oid},
-            {"$set": {"is_available": is_available}},
-            return_document=True,
-        )
+        try:
+            result = await self._col.find_one_and_update(
+                {"_id": oid},
+                {"$set": {"is_available": is_available}},
+                return_document=True,
+            )
+        except pymongo.errors.PyMongoError as exc:
+            raise WriteUnavailableError(str(exc)) from exc
         return self._to_domain(result) if result else None
 
     def _to_domain(self, doc: dict) -> MenuItem:

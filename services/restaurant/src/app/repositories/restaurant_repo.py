@@ -1,6 +1,8 @@
+import pymongo.errors
 from bson import ObjectId
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
+from app.exceptions import WriteUnavailableError
 from app.models.domain import Restaurant
 
 
@@ -27,7 +29,10 @@ class RestaurantRepository:
             "rating": rating,
             "is_active": True,
         }
-        result = await self._col.insert_one(doc)
+        try:
+            result = await self._col.insert_one(doc)
+        except pymongo.errors.PyMongoError as exc:
+            raise WriteUnavailableError(str(exc)) from exc
         doc["_id"] = result.inserted_id
         return self._to_domain(doc)
 

@@ -2,6 +2,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from unittest.mock import AsyncMock, patch
 
+from app.exceptions import WriteUnavailableError
 from app.models.domain import MenuItem
 
 
@@ -169,3 +170,31 @@ async def test_set_availability_requires_restaurant_role():
         app.dependency_overrides.clear()
 
     assert response.status_code == 403
+
+
+@pytest.mark.anyio
+async def test_set_availability_returns_503_on_write_failure(sample_item):
+    from app.main import app
+    from app.api.v1.menu_items import get_menu_service
+    from app.dependencies.auth import require_restaurant_role
+
+    mock_service = AsyncMock()
+    mock_service.set_item_availability = AsyncMock(side_effect=WriteUnavailableError("not primary"))
+
+    async def mock_auth():
+        return {"user_id": "u1", "role": "restaurant"}
+
+    app.dependency_overrides[get_menu_service] = lambda: mock_service
+    app.dependency_overrides[require_restaurant_role] = mock_auth
+    try:
+        with patch("app.db.mongo.connect", new_callable=AsyncMock), \
+             patch("app.db.mongo.disconnect", new_callable=AsyncMock):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                response = await client.patch(
+                    f"/api/v1/menu-items/{sample_item.id}/availability",
+                    json={"is_available": False},
+                )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 503

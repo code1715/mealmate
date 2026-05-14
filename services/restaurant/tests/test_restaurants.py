@@ -2,6 +2,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from unittest.mock import AsyncMock, patch
 
+from app.exceptions import WriteUnavailableError
 from app.models.domain import MenuItem, Restaurant
 
 
@@ -409,3 +410,57 @@ async def test_add_menu_item_to_restaurant_not_found():
 
     assert response.status_code == 404
     assert response.json()["detail"] == "Restaurant not found"
+
+
+# --- 503 on write unavailable ---
+
+@pytest.mark.anyio
+async def test_create_restaurant_returns_503_on_write_failure():
+    from app.main import app
+    from app.api.v1.restaurants import get_restaurant_service
+
+    mock_service = AsyncMock()
+    mock_service.create_restaurant = AsyncMock(side_effect=WriteUnavailableError("not primary"))
+
+    app.dependency_overrides[get_restaurant_service] = lambda: mock_service
+    try:
+        with patch("app.db.mongo.connect", new_callable=AsyncMock), \
+             patch("app.db.mongo.disconnect", new_callable=AsyncMock):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                response = await client.post(
+                    "/api/v1/restaurants",
+                    json={"name": "Burger Palace", "address": "10 Main St", "cuisine": "American", "rating": 4.5},
+                )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 503
+
+
+@pytest.mark.anyio
+async def test_add_menu_item_to_restaurant_returns_503_on_write_failure(sample_restaurant):
+    from app.main import app
+    from app.api.v1.restaurants import get_restaurant_service, get_menu_service
+    from app.dependencies.auth import require_restaurant_role
+
+    mock_restaurant_service = AsyncMock()
+    mock_restaurant_service.get_restaurant = AsyncMock(return_value=sample_restaurant)
+    mock_menu_service = AsyncMock()
+    mock_menu_service.add_item = AsyncMock(side_effect=WriteUnavailableError("not primary"))
+
+    app.dependency_overrides[get_restaurant_service] = lambda: mock_restaurant_service
+    app.dependency_overrides[get_menu_service] = lambda: mock_menu_service
+    app.dependency_overrides[require_restaurant_role] = _auth_override("restaurant")
+    try:
+        with patch("app.db.mongo.connect", new_callable=AsyncMock), \
+             patch("app.db.mongo.disconnect", new_callable=AsyncMock):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                response = await client.post(
+                    "/api/v1/restaurants/64b8f1c2e4b0a1234567890a/menu",
+                    headers={"Authorization": "Bearer valid-token"},
+                    json={"name": "Burger", "description": "Tasty", "price": 5.0},
+                )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 503
