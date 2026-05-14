@@ -1,0 +1,2 @@
+class WriteUnavailableError(Exception):
+    pass
