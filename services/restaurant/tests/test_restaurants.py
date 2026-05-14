@@ -2,7 +2,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from unittest.mock import AsyncMock, patch
 
-from app.models.domain import Restaurant
+from app.models.domain import MenuItem, Restaurant
 
 
 @pytest.fixture
@@ -156,3 +156,100 @@ async def test_create_restaurant_rejects_invalid_rating():
         app.dependency_overrides.clear()
 
     assert response.status_code == 422
+
+
+@pytest.mark.anyio
+async def test_get_restaurant_returns_200(sample_restaurant):
+    from app.main import app
+    from app.api.v1.restaurants import get_restaurant_service
+
+    mock_service = AsyncMock()
+    mock_service.get_restaurant = AsyncMock(return_value=sample_restaurant)
+
+    app.dependency_overrides[get_restaurant_service] = lambda: mock_service
+    try:
+        with patch("app.db.mongo.connect", new_callable=AsyncMock), \
+             patch("app.db.mongo.disconnect", new_callable=AsyncMock):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                response = await client.get("/api/v1/restaurants/64b8f1c2e4b0a1234567890a")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["id"] == "64b8f1c2e4b0a1234567890a"
+    assert data["name"] == "Burger Palace"
+    assert data["cuisine"] == "American"
+    assert data["rating"] == 4.5
+    assert data["is_active"] is True
+    assert "_id" not in data
+
+
+@pytest.mark.anyio
+async def test_get_restaurant_menu_returns_200(sample_restaurant):
+    from app.main import app
+    from app.api.v1.restaurants import get_restaurant_service, get_menu_service
+
+    sample_items = [
+        MenuItem(
+            id="64b8f1c2e4b0a1234567890b",
+            restaurant_id="64b8f1c2e4b0a1234567890a",
+            name="Cheeseburger",
+            description="Classic beef patty",
+            price=9.99,
+            is_available=True,
+        ),
+        MenuItem(
+            id="64b8f1c2e4b0a1234567890c",
+            restaurant_id="64b8f1c2e4b0a1234567890a",
+            name="Fries",
+            description="Crispy fries",
+            price=3.99,
+            is_available=True,
+        ),
+    ]
+
+    mock_restaurant_service = AsyncMock()
+    mock_restaurant_service.get_restaurant = AsyncMock(return_value=sample_restaurant)
+    mock_menu_service = AsyncMock()
+    mock_menu_service.get_menu = AsyncMock(return_value=sample_items)
+
+    app.dependency_overrides[get_restaurant_service] = lambda: mock_restaurant_service
+    app.dependency_overrides[get_menu_service] = lambda: mock_menu_service
+    try:
+        with patch("app.db.mongo.connect", new_callable=AsyncMock), \
+             patch("app.db.mongo.disconnect", new_callable=AsyncMock):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                response = await client.get("/api/v1/restaurants/64b8f1c2e4b0a1234567890a/menu")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    items = response.json()
+    assert len(items) == 2
+    assert all(item["is_available"] is True for item in items)
+    assert items[0]["name"] == "Cheeseburger"
+    assert items[0]["price"] == 9.99
+    assert "_id" not in items[0]
+
+
+@pytest.mark.anyio
+async def test_get_restaurant_menu_invalid_id_returns_404():
+    from app.main import app
+    from app.api.v1.restaurants import get_menu_service, get_restaurant_service
+
+    mock_restaurant_service = AsyncMock()
+    mock_restaurant_service.get_restaurant = AsyncMock(return_value=None)
+
+    app.dependency_overrides[get_restaurant_service] = lambda: mock_restaurant_service
+    app.dependency_overrides[get_menu_service] = lambda: AsyncMock()
+    try:
+        with patch("app.db.mongo.connect", new_callable=AsyncMock), \
+             patch("app.db.mongo.disconnect", new_callable=AsyncMock):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                response = await client.get("/api/v1/restaurants/not-a-valid-objectid/menu")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Restaurant not found"
