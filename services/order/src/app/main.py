@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.api.orders import router as orders_router
+from app.config import settings
 from app.db.models import Base
 from app.dependencies import engine
 
@@ -24,4 +25,8 @@ app.include_router(orders_router, prefix="/api")
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "order-service"}
+    return {
+        "status": "ok",
+        "service": "order-service",
+        "instance": settings.service_instance,
+    }

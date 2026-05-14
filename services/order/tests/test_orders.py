@@ -842,3 +842,50 @@ def test_valid_transitions_delivered():
 
 def test_valid_transitions_cancelled():
     assert VALID_TRANSITIONS[OrderStatus.CANCELLED] == set()
+
+
+# ---------------------------------------------------------------------------
+# Tests — Health endpoint with instance identification (#29)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_health_includes_instance(client):
+    """Health endpoint returns instance identifier for load-balancer debugging."""
+    resp = await client.get("/health")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "ok"
+    assert body["service"] == "order-service"
+    assert "instance" in body
+
+
+# ---------------------------------------------------------------------------
+# Tests — Config settings
+# ---------------------------------------------------------------------------
+
+
+from app.config import settings
+
+
+def test_config_has_service_instance():
+    """Settings include a service_instance field."""
+    assert hasattr(settings, "service_instance")
+    assert isinstance(settings.service_instance, str)
+    assert len(settings.service_instance) > 0
+
+
+def test_config_postgres_url_matches_docker_compose():
+    """Default postgres_url points to the docker-compose postgres-orders service."""
+    assert "postgres-orders" in settings.postgres_url
+    assert "/orders" in settings.postgres_url
+
+
+def test_config_redis_url_uses_db_0():
+    """Default redis_url uses DB 0, matching docker-compose."""
+    assert settings.redis_url.endswith("/0")
+
+
+def test_config_kafka_topic_is_correct():
+    """Kafka topic matches api-contracts.md."""
+    assert settings.kafka_topic == "order-status-changed"

@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     kafka_brokers: str = "kafka:29092"
     kafka_topic: str = "order-status-changed"
 
+    # Instance identification (for load-balancer debugging)
+    service_instance: str = "order-1"
+
     # Auth Service (for token validation)
     auth_service_url: str = "http://auth:8000"
 
