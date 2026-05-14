@@ -35,7 +35,7 @@ async def test_list_restaurants_returns_empty():
         with patch("app.db.mongo.connect", new_callable=AsyncMock), \
              patch("app.db.mongo.disconnect", new_callable=AsyncMock):
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-                response = await client.get("/api/v1/restaurants/")
+                response = await client.get("/api/v1/restaurants")
     finally:
         app.dependency_overrides.clear()
 
@@ -79,7 +79,7 @@ async def test_list_restaurants_returns_data(sample_restaurant):
         with patch("app.db.mongo.connect", new_callable=AsyncMock), \
              patch("app.db.mongo.disconnect", new_callable=AsyncMock):
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-                response = await client.get("/api/v1/restaurants/")
+                response = await client.get("/api/v1/restaurants")
     finally:
         app.dependency_overrides.clear()
 
@@ -105,7 +105,7 @@ async def test_create_restaurant_returns_201(sample_restaurant):
              patch("app.db.mongo.disconnect", new_callable=AsyncMock):
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 response = await client.post(
-                    "/api/v1/restaurants/",
+                    "/api/v1/restaurants",
                     json={"name": "Burger Palace", "address": "10 Main St", "cuisine": "American", "rating": 4.5},
                 )
     finally:
@@ -129,7 +129,7 @@ async def test_create_restaurant_rejects_missing_fields():
              patch("app.db.mongo.disconnect", new_callable=AsyncMock):
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 response = await client.post(
-                    "/api/v1/restaurants/",
+                    "/api/v1/restaurants",
                     json={"name": "Incomplete"},
                 )
     finally:
@@ -149,7 +149,7 @@ async def test_create_restaurant_rejects_invalid_rating():
              patch("app.db.mongo.disconnect", new_callable=AsyncMock):
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 response = await client.post(
-                    "/api/v1/restaurants/",
+                    "/api/v1/restaurants",
                     json={"name": "Bad", "address": "1 St", "cuisine": "Any", "rating": 10.0},
                 )
     finally:

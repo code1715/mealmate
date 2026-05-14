@@ -19,7 +19,7 @@ def get_menu_service() -> MenuService:
     return MenuService(MenuRepository(get_db()))
 
 
-@router.get("/", response_model=RestaurantListResponse)
+@router.get("", response_model=RestaurantListResponse)
 async def list_restaurants(service: RestaurantService = Depends(get_restaurant_service)):
     items = await service.list_restaurants()
     return RestaurantListResponse(
@@ -34,7 +34,7 @@ async def list_restaurants(service: RestaurantService = Depends(get_restaurant_s
     )
 
 
-@router.post("/", response_model=RestaurantResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=RestaurantResponse, status_code=status.HTTP_201_CREATED)
 async def create_restaurant(
     body: RestaurantCreate,
     service: RestaurantService = Depends(get_restaurant_service),
