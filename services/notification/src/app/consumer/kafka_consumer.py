@@ -1,5 +1,6 @@
 import json
 import logging
+import time
 
 from confluent_kafka import Consumer, KafkaError, KafkaException
 
@@ -47,6 +48,7 @@ class NotificationKafkaConsumer:
                     if msg.error().code() == KafkaError._PARTITION_EOF:
                         continue
                     logger.error("Kafka error: %s", msg.error())
+                    time.sleep(5)
                     continue
                 if self._process_raw(msg.value()):
                     consumer.commit(message=msg)

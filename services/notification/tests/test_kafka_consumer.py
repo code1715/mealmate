@@ -1,5 +1,7 @@
 import json
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
+
+from confluent_kafka import KafkaError
 
 from app.config import Settings
 from app.consumer.kafka_consumer import NotificationKafkaConsumer
@@ -96,3 +98,43 @@ def test_process_raw_returns_false_on_missing_fields():
     )
     result = consumer._process_raw(json.dumps({"order_id": "x"}).encode())
     assert result is False
+
+
+def test_non_eof_error_sleeps_before_continuing():
+    with patch("app.consumer.kafka_consumer.time") as mock_time:
+        with patch("app.consumer.kafka_consumer.Consumer") as MockConsumer:
+            mock_kafka = MockConsumer.return_value
+            service = MagicMock()
+            consumer = NotificationKafkaConsumer(
+                service=service, brokers="b", topic="t", group_id="g"
+            )
+            error_msg = MagicMock()
+            error_msg.error.return_value.code.return_value = KafkaError.BROKER_NOT_AVAILABLE
+
+            def poll_side_effect(timeout):
+                consumer.stop()
+                return error_msg
+
+            mock_kafka.poll.side_effect = poll_side_effect
+            consumer.start()
+            mock_time.sleep.assert_called_once_with(5)
+
+
+def test_eof_error_does_not_sleep():
+    with patch("app.consumer.kafka_consumer.time") as mock_time:
+        with patch("app.consumer.kafka_consumer.Consumer") as MockConsumer:
+            mock_kafka = MockConsumer.return_value
+            service = MagicMock()
+            consumer = NotificationKafkaConsumer(
+                service=service, brokers="b", topic="t", group_id="g"
+            )
+            eof_msg = MagicMock()
+            eof_msg.error.return_value.code.return_value = KafkaError._PARTITION_EOF
+
+            def poll_side_effect(timeout):
+                consumer.stop()
+                return eof_msg
+
+            mock_kafka.poll.side_effect = poll_side_effect
+            consumer.start()
+            mock_time.sleep.assert_not_called()

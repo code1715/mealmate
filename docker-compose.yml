@@ -320,6 +320,7 @@ services:
         condition: service_healthy
     volumes:
       - notification_logs:/app/logs
+    restart: on-failure
     healthcheck:
       test:
         [
