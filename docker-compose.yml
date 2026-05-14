@@ -318,6 +318,8 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
+    volumes:
+      - notification_logs:/app/logs
     healthcheck:
       test:
         [
@@ -340,3 +342,4 @@ volumes:
   zookeeper_log:
   kafka_data:
   neo4j_data:
+  notification_logs:

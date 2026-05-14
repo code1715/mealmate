@@ -5,6 +5,7 @@ class Settings(BaseSettings):
     kafka_brokers: str = "kafka:29092"
     kafka_topic: str = "order-status-changed"
     kafka_group_id: str = "notification-group"
+    log_path: str = "/app/logs/notifications.log"
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
