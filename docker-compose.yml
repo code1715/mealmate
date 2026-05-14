@@ -84,6 +84,16 @@ services:
       - ./docker/mongo-init.sh:/mongo-init.sh:ro
     entrypoint: ["bash", "/mongo-init.sh"]
 
+  mongo-seed:
+    image: mongo:8.3.1
+    depends_on:
+      mongo-init:
+        condition: service_completed_successfully
+    restart: "no"
+    volumes:
+      - ./docker/mongo-seed.sh:/mongo-seed.sh:ro
+    entrypoint: ["bash", "/mongo-seed.sh"]
+
   redis:
     image: redis:8.6.3
     command: ["redis-server", "--appendonly", "yes"]
