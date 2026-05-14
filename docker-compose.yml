@@ -173,8 +173,8 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.auth
-    expose:
-      - "8000"
+    ports:
+      - "8001:8000"
     environment:
       POSTGRES_URL: postgresql+asyncpg://mealmate:mealmate@postgres-auth:5432/auth
       REDIS_URL: redis://redis:6379/0
@@ -198,8 +198,8 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.order
-    expose:
-      - "8000"
+    ports:
+      - "8002:8000"
     environment:
       POSTGRES_URL: postgresql+asyncpg://mealmate:mealmate@postgres-orders:5432/orders
       REDIS_URL: redis://redis:6379/0
@@ -226,8 +226,8 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.order
-    expose:
-      - "8000"
+    ports:
+      - "8006:8000"
     environment:
       POSTGRES_URL: postgresql+asyncpg://mealmate:mealmate@postgres-orders:5432/orders
       REDIS_URL: redis://redis:6379/0
@@ -279,8 +279,8 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.restaurant
-    expose:
-      - "8000"
+    ports:
+      - "8003:8000"
     depends_on:
       mongo1:
         condition: service_healthy
@@ -299,8 +299,12 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.routing
-    expose:
-      - "8000"
+    ports:
+      - "8004:8000"
+    environment:
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: mealmate
     depends_on:
       neo4j:
         condition: service_healthy
@@ -319,8 +323,8 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.notification
-    expose:
-      - "8000"
+    ports:
+      - "8005:8000"
     depends_on:
       kafka:
         condition: service_healthy
