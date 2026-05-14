@@ -23,6 +23,7 @@ class NotificationKafkaConsumer:
                 "bootstrap.servers": self._brokers,
                 "group.id": self._group_id,
                 "auto.offset.reset": "earliest",
+                "enable.auto.commit": False,
             })
         except KafkaException as e:
             logger.error("Kafka consumer init failed: %s", e)
@@ -31,7 +32,10 @@ class NotificationKafkaConsumer:
         consumer.subscribe([self._topic])
         self._running = True
         logger.info(
-            "Kafka consumer started — topic=%s brokers=%s", self._topic, self._brokers
+            "Kafka consumer started — topic=%s group=%s brokers=%s",
+            self._topic,
+            self._group_id,
+            self._brokers,
         )
 
         try:
@@ -44,7 +48,8 @@ class NotificationKafkaConsumer:
                         continue
                     logger.error("Kafka error: %s", msg.error())
                     continue
-                self._process_raw(msg.value())
+                if self._process_raw(msg.value()):
+                    consumer.commit(message=msg)
         finally:
             consumer.close()
             logger.info("Kafka consumer closed")
@@ -52,11 +57,12 @@ class NotificationKafkaConsumer:
     def stop(self) -> None:
         self._running = False
 
-    def _process_raw(self, value: bytes) -> None:
+    def _process_raw(self, value: bytes) -> bool:
         try:
             data = json.loads(value)
             event = OrderStatusEvent(**data)
         except Exception as e:
             logger.error("Failed to parse Kafka message: %s — raw=%s", e, value[:200])
-            return
+            return False
         self._service.handle(event)
+        return True

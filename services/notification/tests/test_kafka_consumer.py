@@ -1,6 +1,7 @@
 import json
 from unittest.mock import MagicMock
 
+from app.config import Settings
 from app.consumer.kafka_consumer import NotificationKafkaConsumer
 from app.domain.models import OrderStatusEvent
 
@@ -64,3 +65,34 @@ def test_initial_running_state_is_false():
         service=service, brokers="localhost:9092", topic="t", group_id="g"
     )
     assert consumer._running is False
+
+
+def test_default_group_id_is_notification_group():
+    assert Settings.model_fields["kafka_group_id"].default == "notification-group"
+
+
+def test_process_raw_returns_true_on_success():
+    service = MagicMock()
+    consumer = NotificationKafkaConsumer(
+        service=service, brokers="localhost:9092", topic="t", group_id="g"
+    )
+    result = consumer._process_raw(_sample_event_bytes())
+    assert result is True
+
+
+def test_process_raw_returns_false_on_invalid_json():
+    service = MagicMock()
+    consumer = NotificationKafkaConsumer(
+        service=service, brokers="localhost:9092", topic="t", group_id="g"
+    )
+    result = consumer._process_raw(b"not-valid-json")
+    assert result is False
+
+
+def test_process_raw_returns_false_on_missing_fields():
+    service = MagicMock()
+    consumer = NotificationKafkaConsumer(
+        service=service, brokers="localhost:9092", topic="t", group_id="g"
+    )
+    result = consumer._process_raw(json.dumps({"order_id": "x"}).encode())
+    assert result is False
