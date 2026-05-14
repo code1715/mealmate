@@ -11,3 +11,6 @@ class MenuService:
 
     async def add_item(self, restaurant_id: str, name: str, description: str, price: float) -> MenuItem:
         return await self._repo.create(restaurant_id, name, description, price)
+
+    async def set_item_availability(self, item_id: str, is_available: bool) -> MenuItem | None:
+        return await self._repo.set_availability(item_id, is_available)

@@ -19,6 +19,10 @@ class MenuItemCreate(BaseModel):
     }
 
 
+class MenuItemAvailabilityUpdate(BaseModel):
+    is_available: bool
+
+
 class MenuItemResponse(BaseModel):
     id: str
     restaurant_id: str

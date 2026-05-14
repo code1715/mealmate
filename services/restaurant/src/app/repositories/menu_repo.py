@@ -24,6 +24,18 @@ class MenuRepository:
         doc["_id"] = result.inserted_id
         return self._to_domain(doc)
 
+    async def set_availability(self, item_id: str, is_available: bool) -> MenuItem | None:
+        try:
+            oid = ObjectId(item_id)
+        except Exception:
+            return None
+        result = await self._col.find_one_and_update(
+            {"_id": oid},
+            {"$set": {"is_available": is_available}},
+            return_document=True,
+        )
+        return self._to_domain(result) if result else None
+
     def _to_domain(self, doc: dict) -> MenuItem:
         return MenuItem(
             id=str(doc["_id"]),
