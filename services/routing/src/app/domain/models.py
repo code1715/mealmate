@@ -11,8 +11,24 @@ class CourierStatus(str, Enum):
 
 
 class Courier(BaseModel):
-    courier_id: uuid.UUID
+    id: uuid.UUID
+    name: str
     status: CourierStatus
+    lat: float
+    lng: float
+
+
+class Zone(BaseModel):
+    id: uuid.UUID
+    name: str
+
+
+class Restaurant(BaseModel):
+    id: uuid.UUID
+    name: str
+    zone_id: uuid.UUID
+    lat: float
+    lng: float
 
 
 class MatchRequest(BaseModel):

@@ -51,6 +51,10 @@ docker compose up --build
 **MongoDB replica set and Kafka topics are initialized automatically** by the
 `mongo-init` and `kafka-init` containers on first startup — no manual step required.
 
+**Neo4j graph schema and seed data are initialized automatically** by the
+`neo4j-seed` container on first startup (zones, restaurants, couriers with
+`LOCATED_IN` relationships). The script is idempotent — safe to re-run.
+
 To run only infrastructure (databases, Kafka, Redis) without application services:
 
 ```bash

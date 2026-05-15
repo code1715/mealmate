@@ -18,7 +18,7 @@ class Neo4jRepository:
         with self._driver.session() as session:
             result = session.run(
                 """
-                MATCH (c:Courier {courier_id: $courier_id})
+                MATCH (c:Courier {id: $courier_id})
                 SET c.status = $status
                 RETURN c
                 """,
@@ -30,6 +30,9 @@ class Neo4jRepository:
                 return None
             node = record["c"]
             return Courier(
-                courier_id=uuid.UUID(node["courier_id"]),
+                id=uuid.UUID(node["id"]),
+                name=node["name"],
                 status=CourierStatus(node["status"]),
+                lat=node["lat"],
+                lng=node["lng"],
             )

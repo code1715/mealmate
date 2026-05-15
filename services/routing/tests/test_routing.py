@@ -2,8 +2,20 @@ import uuid
 import pytest
 from unittest.mock import MagicMock, patch
 
-from app.domain.models import CourierStatus, Courier, MatchResult, MatchRequest, CourierStatusUpdate
+from app.domain.models import (
+    CourierStatus,
+    Courier,
+    Zone,
+    Restaurant,
+    MatchResult,
+    MatchRequest,
+    CourierStatusUpdate,
+)
 
+
+# ---------------------------------------------------------------------------
+# Domain model tests
+# ---------------------------------------------------------------------------
 
 def test_courier_status_enum_values():
     assert CourierStatus.AVAILABLE == "AVAILABLE"
@@ -11,9 +23,43 @@ def test_courier_status_enum_values():
     assert CourierStatus.OFFLINE == "OFFLINE"
 
 
-def test_courier_model():
-    c = Courier(courier_id=uuid.uuid4(), status=CourierStatus.AVAILABLE)
+def test_courier_model_full():
+    cid = uuid.uuid4()
+    c = Courier(
+        id=cid,
+        name="Ivan Petrenko",
+        status=CourierStatus.AVAILABLE,
+        lat=50.45,
+        lng=30.52,
+    )
+    assert c.id == cid
+    assert c.name == "Ivan Petrenko"
     assert c.status == CourierStatus.AVAILABLE
+    assert c.lat == 50.45
+    assert c.lng == 30.52
+
+
+def test_zone_model():
+    zid = uuid.uuid4()
+    z = Zone(id=zid, name="Podil")
+    assert z.id == zid
+    assert z.name == "Podil"
+
+
+def test_restaurant_model():
+    rid = uuid.uuid4()
+    zid = uuid.uuid4()
+    r = Restaurant(
+        id=rid,
+        name="Chicken Kyiv",
+        zone_id=zid,
+        lat=50.46,
+        lng=30.53,
+    )
+    assert r.id == rid
+    assert r.zone_id == zid
+    assert r.lat == 50.46
+    assert r.lng == 30.53
 
 
 def test_match_result_model():
@@ -26,7 +72,9 @@ def test_courier_status_update_model():
     assert u.status == CourierStatus.OFFLINE
 
 
-# --- Task 2: Settings ---
+# ---------------------------------------------------------------------------
+# Settings
+# ---------------------------------------------------------------------------
 
 from app.core.database import Settings
 
@@ -38,9 +86,24 @@ def test_settings_defaults():
     assert s.neo4j_password == "mealmate"
 
 
-# --- Task 3: Repository ---
+# ---------------------------------------------------------------------------
+# Repository
+# ---------------------------------------------------------------------------
 
 from app.repositories.neo4j_repo import Neo4jRepository
+
+
+def _courier_node(courier_id: uuid.UUID) -> dict:
+    """Helper: returns a mock Neo4j node dict for a Courier."""
+    return {
+        "c": {
+            "id": str(courier_id),
+            "name": "Ivan Petrenko",
+            "status": "AVAILABLE",
+            "lat": 50.45,
+            "lng": 30.52,
+        }
+    }
 
 
 def test_repo_find_available_couriers_raises_not_implemented():
@@ -63,26 +126,39 @@ def test_repo_update_courier_status_found():
     courier_id = uuid.uuid4()
     mock_driver = MagicMock()
     mock_session = mock_driver.session.return_value.__enter__.return_value
-    mock_session.run.return_value.single.return_value = {
-        "c": {"courier_id": str(courier_id), "status": "AVAILABLE"}
-    }
+    mock_session.run.return_value.single.return_value = _courier_node(courier_id)
 
     repo = Neo4jRepository(mock_driver)
     courier = repo.update_courier_status(courier_id, CourierStatus.AVAILABLE)
     assert courier is not None
-    assert courier.courier_id == courier_id
+    assert courier.id == courier_id
+    assert courier.name == "Ivan Petrenko"
     assert courier.status == CourierStatus.AVAILABLE
+    assert courier.lat == 50.45
+    assert courier.lng == 30.52
 
 
-# --- Task 4: Service layer ---
+# ---------------------------------------------------------------------------
+# Service layer
+# ---------------------------------------------------------------------------
 
 from app.services.matching import MatchingService
+
+
+def _make_courier(courier_id: uuid.UUID) -> Courier:
+    return Courier(
+        id=courier_id,
+        name="Ivan Petrenko",
+        status=CourierStatus.AVAILABLE,
+        lat=50.45,
+        lng=30.52,
+    )
 
 
 def test_matching_service_update_status_delegates_to_repo():
     mock_repo = MagicMock()
     courier_id = uuid.uuid4()
-    expected = Courier(courier_id=courier_id, status=CourierStatus.AVAILABLE)
+    expected = _make_courier(courier_id)
     mock_repo.update_courier_status.return_value = expected
 
     svc = MatchingService(mock_repo)
@@ -106,7 +182,9 @@ def test_matching_service_match_raises_not_implemented():
         svc.match(uuid.uuid4(), uuid.uuid4())
 
 
-# --- Task 5: HTTP routes and main app ---
+# ---------------------------------------------------------------------------
+# HTTP layer
+# ---------------------------------------------------------------------------
 
 from fastapi.testclient import TestClient
 from app.main import app
@@ -157,9 +235,7 @@ def test_update_courier_status_not_found(client, mock_driver):
 def test_update_courier_status_success(client, mock_driver):
     courier_id = uuid.uuid4()
     mock_session = mock_driver.session.return_value.__enter__.return_value
-    mock_session.run.return_value.single.return_value = {
-        "c": {"courier_id": str(courier_id), "status": "AVAILABLE"}
-    }
+    mock_session.run.return_value.single.return_value = _courier_node(courier_id)
 
     resp = client.patch(
         f"/api/routing/couriers/{courier_id}/status",
@@ -167,5 +243,8 @@ def test_update_courier_status_success(client, mock_driver):
     )
     assert resp.status_code == 200
     body = resp.json()
-    assert body["courier_id"] == str(courier_id)
+    assert body["id"] == str(courier_id)
+    assert body["name"] == "Ivan Petrenko"
     assert body["status"] == "AVAILABLE"
+    assert body["lat"] == 50.45
+    assert body["lng"] == 30.52
