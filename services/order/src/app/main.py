@@ -2,7 +2,7 @@ import logging
 from contextlib import asynccontextmanager
 
 import sqlalchemy as sa
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 
 from app.api.orders import router as orders_router
 from app.config import settings
@@ -32,6 +32,13 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="MealMate Order Service", version="0.1.0", lifespan=lifespan)
 app.include_router(orders_router, prefix="/api")
+
+
+@app.middleware("http")
+async def add_instance_header(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Instance-ID"] = settings.service_instance
+    return response
 
 
 @app.get("/health")

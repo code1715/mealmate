@@ -23,7 +23,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="MealMate Restaurant Catalog Service", version="0.1.0", lifespan=lifespan)
 
-app.include_router(restaurants.router, prefix="/api/v1/restaurants", tags=["restaurants"])
+app.include_router(restaurants.router, prefix="/api/restaurants", tags=["restaurants"])
 app.include_router(menu_items.router, prefix="/api/v1/menu-items", tags=["menu-items"])
 
 
