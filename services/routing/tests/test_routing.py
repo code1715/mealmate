@@ -94,7 +94,6 @@ from app.repositories.neo4j_repo import Neo4jRepository
 
 
 def _courier_node(courier_id: uuid.UUID) -> dict:
-    """Helper: returns a mock Neo4j node dict for a Courier."""
     return {
         "c": {
             "id": str(courier_id),
@@ -106,10 +105,76 @@ def _courier_node(courier_id: uuid.UUID) -> dict:
     }
 
 
-def test_repo_find_available_couriers_raises_not_implemented():
-    repo = Neo4jRepository(MagicMock())
-    with pytest.raises(NotImplementedError):
-        repo.find_available_couriers()
+def _restaurant_node(restaurant_id: uuid.UUID, zone_id: uuid.UUID) -> dict:
+    return {
+        "r": {
+            "id": str(restaurant_id),
+            "name": "Burger Palace",
+            "zone_id": str(zone_id),
+            "lat": 50.462,
+            "lng": 30.519,
+        }
+    }
+
+
+def test_repo_get_restaurant_not_found():
+    mock_driver = MagicMock()
+    mock_session = mock_driver.session.return_value.__enter__.return_value
+    mock_session.run.return_value.single.return_value = None
+
+    repo = Neo4jRepository(mock_driver)
+    assert repo.get_restaurant(uuid.uuid4()) is None
+
+
+def test_repo_get_restaurant_found():
+    restaurant_id = uuid.uuid4()
+    zone_id = uuid.uuid4()
+    mock_driver = MagicMock()
+    mock_session = mock_driver.session.return_value.__enter__.return_value
+    mock_session.run.return_value.single.return_value = _restaurant_node(restaurant_id, zone_id)
+
+    repo = Neo4jRepository(mock_driver)
+    restaurant = repo.get_restaurant(restaurant_id)
+    assert restaurant is not None
+    assert restaurant.id == restaurant_id
+    assert restaurant.zone_id == zone_id
+    assert restaurant.lat == 50.462
+    assert restaurant.lng == 30.519
+
+
+def test_repo_find_available_couriers_in_zone_returns_list():
+    courier_id = uuid.uuid4()
+    zone_id = uuid.uuid4()
+    mock_driver = MagicMock()
+    mock_session = mock_driver.session.return_value.__enter__.return_value
+    mock_session.run.return_value = [_courier_node(courier_id)]
+
+    repo = Neo4jRepository(mock_driver)
+    couriers = repo.find_available_couriers_in_zone(zone_id)
+    assert len(couriers) == 1
+    assert couriers[0].id == courier_id
+    assert couriers[0].status == CourierStatus.AVAILABLE
+
+
+def test_repo_find_available_couriers_in_zone_empty():
+    mock_driver = MagicMock()
+    mock_session = mock_driver.session.return_value.__enter__.return_value
+    mock_session.run.return_value = []
+
+    repo = Neo4jRepository(mock_driver)
+    assert repo.find_available_couriers_in_zone(uuid.uuid4()) == []
+
+
+def test_repo_find_all_available_couriers():
+    courier_id = uuid.uuid4()
+    mock_driver = MagicMock()
+    mock_session = mock_driver.session.return_value.__enter__.return_value
+    mock_session.run.return_value = [_courier_node(courier_id)]
+
+    repo = Neo4jRepository(mock_driver)
+    couriers = repo.find_all_available_couriers()
+    assert len(couriers) == 1
+    assert couriers[0].id == courier_id
 
 
 def test_repo_update_courier_status_not_found():
@@ -145,14 +210,84 @@ def test_repo_update_courier_status_found():
 from app.services.matching import MatchingService
 
 
-def _make_courier(courier_id: uuid.UUID) -> Courier:
+def _make_restaurant(zone_id: uuid.UUID | None = None) -> Restaurant:
+    return Restaurant(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000101"),
+        name="Burger Palace",
+        zone_id=zone_id or uuid.UUID("00000000-0000-0000-0000-000000000001"),
+        lat=50.462,
+        lng=30.519,
+    )
+
+
+def _make_courier(courier_id: uuid.UUID | None = None) -> Courier:
     return Courier(
-        id=courier_id,
+        id=courier_id or uuid.uuid4(),
         name="Ivan Petrenko",
         status=CourierStatus.AVAILABLE,
-        lat=50.45,
-        lng=30.52,
+        lat=50.464,
+        lng=30.520,
     )
+
+
+def test_matching_service_match_returns_nearest_in_zone():
+    mock_repo = MagicMock()
+    restaurant = _make_restaurant()
+    courier = _make_courier()
+    mock_repo.get_restaurant.return_value = restaurant
+    mock_repo.find_available_couriers_in_zone.return_value = [courier]
+
+    order_id = uuid.uuid4()
+    result = MatchingService(mock_repo).match(order_id, restaurant.id)
+
+    assert result.order_id == order_id
+    assert result.courier_id == courier.id
+    assert result.estimated_minutes >= 1
+    mock_repo.find_all_available_couriers.assert_not_called()
+
+
+def test_matching_service_match_falls_back_to_all_zones():
+    mock_repo = MagicMock()
+    restaurant = _make_restaurant()
+    courier = _make_courier()
+    mock_repo.get_restaurant.return_value = restaurant
+    mock_repo.find_available_couriers_in_zone.return_value = []
+    mock_repo.find_all_available_couriers.return_value = [courier]
+
+    result = MatchingService(mock_repo).match(uuid.uuid4(), restaurant.id)
+    assert result.courier_id == courier.id
+
+
+def test_matching_service_match_raises_restaurant_not_found():
+    mock_repo = MagicMock()
+    mock_repo.get_restaurant.return_value = None
+
+    with pytest.raises(ValueError, match="Restaurant not found"):
+        MatchingService(mock_repo).match(uuid.uuid4(), uuid.uuid4())
+
+
+def test_matching_service_match_raises_no_couriers_available():
+    mock_repo = MagicMock()
+    mock_repo.get_restaurant.return_value = _make_restaurant()
+    mock_repo.find_available_couriers_in_zone.return_value = []
+    mock_repo.find_all_available_couriers.return_value = []
+
+    with pytest.raises(ValueError, match="No couriers available"):
+        MatchingService(mock_repo).match(uuid.uuid4(), uuid.uuid4())
+
+
+def test_matching_service_match_picks_nearest_of_two_couriers():
+    mock_repo = MagicMock()
+    restaurant = _make_restaurant()
+    # near courier — ~0.25 km away
+    near = Courier(id=uuid.uuid4(), name="Near", status=CourierStatus.AVAILABLE, lat=50.464, lng=30.520)
+    # far courier — ~5 km away
+    far = Courier(id=uuid.uuid4(), name="Far", status=CourierStatus.AVAILABLE, lat=50.510, lng=30.560)
+    mock_repo.get_restaurant.return_value = restaurant
+    mock_repo.find_available_couriers_in_zone.return_value = [near, far]
+
+    result = MatchingService(mock_repo).match(uuid.uuid4(), restaurant.id)
+    assert result.courier_id == near.id
 
 
 def test_matching_service_update_status_delegates_to_repo():
@@ -174,12 +309,6 @@ def test_matching_service_update_status_not_found():
 
     svc = MatchingService(mock_repo)
     assert svc.update_courier_status(uuid.uuid4(), CourierStatus.OFFLINE) is None
-
-
-def test_matching_service_match_raises_not_implemented():
-    svc = MatchingService(MagicMock())
-    with pytest.raises(NotImplementedError):
-        svc.match(uuid.uuid4(), uuid.uuid4())
 
 
 # ---------------------------------------------------------------------------
@@ -211,12 +340,45 @@ def test_health_returns_ok_with_service_name(client):
     assert response.json() == {"status": "ok", "service": "routing-service"}
 
 
-def test_match_endpoint_not_implemented_returns_501(client):
-    resp = client.post(
-        "/api/routing/match",
-        json={"order_id": str(uuid.uuid4()), "restaurant_id": str(uuid.uuid4())},
-    )
-    assert resp.status_code == 501
+def test_match_endpoint_returns_200(client):
+    order_id = uuid.uuid4()
+    restaurant_id = uuid.uuid4()
+    courier_id = uuid.uuid4()
+    expected = MatchResult(order_id=order_id, courier_id=courier_id, estimated_minutes=5)
+
+    with patch.object(MatchingService, "match", return_value=expected):
+        resp = client.post(
+            "/api/routing/match",
+            json={"order_id": str(order_id), "restaurant_id": str(restaurant_id)},
+        )
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["order_id"] == str(order_id)
+    assert body["courier_id"] == str(courier_id)
+    assert body["estimated_minutes"] == 5
+
+
+def test_match_endpoint_returns_404_when_no_couriers(client):
+    with patch.object(MatchingService, "match", side_effect=ValueError("No couriers available")):
+        resp = client.post(
+            "/api/routing/match",
+            json={"order_id": str(uuid.uuid4()), "restaurant_id": str(uuid.uuid4())},
+        )
+
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "No couriers available"
+
+
+def test_match_endpoint_returns_404_when_restaurant_not_found(client):
+    with patch.object(MatchingService, "match", side_effect=ValueError("Restaurant not found")):
+        resp = client.post(
+            "/api/routing/match",
+            json={"order_id": str(uuid.uuid4()), "restaurant_id": str(uuid.uuid4())},
+        )
+
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "Restaurant not found"
 
 
 def test_update_courier_status_not_found(client, mock_driver):
