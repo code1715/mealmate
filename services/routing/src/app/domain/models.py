@@ -44,3 +44,19 @@ class MatchResult(BaseModel):
 
 class CourierStatusUpdate(BaseModel):
     status: CourierStatus
+
+
+class CourierStatusInput(str, Enum):
+    """Status values accepted via the PATCH endpoint — OFFLINE is not settable via API."""
+    AVAILABLE = "AVAILABLE"
+    BUSY = "BUSY"
+
+
+class UpdateStatusPayload(BaseModel):
+    status: CourierStatusInput
+
+
+class CourierStatusResponse(BaseModel):
+    courier_id: uuid.UUID
+    status: CourierStatus
+    updated: bool = True

@@ -4,7 +4,13 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from neo4j import Driver
 
 from app.core.database import get_driver
-from app.domain.models import Courier, CourierStatusUpdate, MatchRequest, MatchResult
+from app.domain.models import (
+    CourierStatus,
+    CourierStatusResponse,
+    MatchRequest,
+    MatchResult,
+    UpdateStatusPayload,
+)
 from app.repositories.neo4j_repo import Neo4jRepository
 from app.services.matching import MatchingService
 
@@ -35,15 +41,15 @@ def match_courier(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
 
 
-@router.patch("/couriers/{courier_id}/status", response_model=Courier)
+@router.patch("/couriers/{courier_id}/status", response_model=CourierStatusResponse)
 def update_courier_status(
     courier_id: uuid.UUID,
-    payload: CourierStatusUpdate,
+    payload: UpdateStatusPayload,
     service: MatchingService = Depends(get_service),
-) -> Courier:
-    courier = service.update_courier_status(courier_id, payload.status)
+) -> CourierStatusResponse:
+    courier = service.update_courier_status(courier_id, CourierStatus(payload.status))
     if courier is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Courier not found"
         )
-    return courier
+    return CourierStatusResponse(courier_id=courier.id, status=courier.status)

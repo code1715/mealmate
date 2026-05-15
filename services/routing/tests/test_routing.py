@@ -4,12 +4,15 @@ from unittest.mock import MagicMock, patch
 
 from app.domain.models import (
     CourierStatus,
+    CourierStatusInput,
     Courier,
     Zone,
     Restaurant,
     MatchResult,
     MatchRequest,
     CourierStatusUpdate,
+    UpdateStatusPayload,
+    CourierStatusResponse,
 )
 
 
@@ -70,6 +73,24 @@ def test_match_result_model():
 def test_courier_status_update_model():
     u = CourierStatusUpdate(status=CourierStatus.OFFLINE)
     assert u.status == CourierStatus.OFFLINE
+
+
+def test_courier_status_input_only_available_and_busy():
+    assert set(CourierStatusInput) == {CourierStatusInput.AVAILABLE, CourierStatusInput.BUSY}
+
+
+def test_update_status_payload_rejects_offline():
+    import pydantic
+    with pytest.raises(pydantic.ValidationError):
+        UpdateStatusPayload(status="OFFLINE")
+
+
+def test_courier_status_response_model():
+    cid = uuid.uuid4()
+    r = CourierStatusResponse(courier_id=cid, status=CourierStatus.BUSY)
+    assert r.courier_id == cid
+    assert r.status == CourierStatus.BUSY
+    assert r.updated is True
 
 
 # ---------------------------------------------------------------------------
@@ -405,8 +426,14 @@ def test_update_courier_status_success(client, mock_driver):
     )
     assert resp.status_code == 200
     body = resp.json()
-    assert body["id"] == str(courier_id)
-    assert body["name"] == "Ivan Petrenko"
+    assert body["courier_id"] == str(courier_id)
     assert body["status"] == "AVAILABLE"
-    assert body["lat"] == 50.45
-    assert body["lng"] == 30.52
+    assert body["updated"] is True
+
+
+def test_update_courier_status_offline_returns_422(client):
+    resp = client.patch(
+        f"/api/routing/couriers/{uuid.uuid4()}/status",
+        json={"status": "OFFLINE"},
+    )
+    assert resp.status_code == 422
