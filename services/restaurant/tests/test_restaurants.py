@@ -36,7 +36,7 @@ async def test_list_restaurants_returns_empty():
         with patch("app.db.mongo.connect", new_callable=AsyncMock), \
              patch("app.db.mongo.disconnect", new_callable=AsyncMock):
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-                response = await client.get("/api/v1/restaurants")
+                response = await client.get("/api/restaurants")
     finally:
         app.dependency_overrides.clear()
 
@@ -59,7 +59,7 @@ async def test_get_restaurant_not_found():
         with patch("app.db.mongo.connect", new_callable=AsyncMock), \
              patch("app.db.mongo.disconnect", new_callable=AsyncMock):
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-                response = await client.get("/api/v1/restaurants/000000000000000000000000")
+                response = await client.get("/api/restaurants/000000000000000000000000")
     finally:
         app.dependency_overrides.clear()
 
@@ -80,7 +80,7 @@ async def test_list_restaurants_returns_data(sample_restaurant):
         with patch("app.db.mongo.connect", new_callable=AsyncMock), \
              patch("app.db.mongo.disconnect", new_callable=AsyncMock):
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-                response = await client.get("/api/v1/restaurants")
+                response = await client.get("/api/restaurants")
     finally:
         app.dependency_overrides.clear()
 
@@ -106,7 +106,7 @@ async def test_create_restaurant_returns_201(sample_restaurant):
              patch("app.db.mongo.disconnect", new_callable=AsyncMock):
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 response = await client.post(
-                    "/api/v1/restaurants",
+                    "/api/restaurants",
                     json={"name": "Burger Palace", "address": "10 Main St", "cuisine": "American", "rating": 4.5},
                 )
     finally:
@@ -130,7 +130,7 @@ async def test_create_restaurant_rejects_missing_fields():
              patch("app.db.mongo.disconnect", new_callable=AsyncMock):
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 response = await client.post(
-                    "/api/v1/restaurants",
+                    "/api/restaurants",
                     json={"name": "Incomplete"},
                 )
     finally:
@@ -150,7 +150,7 @@ async def test_create_restaurant_rejects_invalid_rating():
              patch("app.db.mongo.disconnect", new_callable=AsyncMock):
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 response = await client.post(
-                    "/api/v1/restaurants",
+                    "/api/restaurants",
                     json={"name": "Bad", "address": "1 St", "cuisine": "Any", "rating": 10.0},
                 )
     finally:
@@ -172,7 +172,7 @@ async def test_get_restaurant_returns_200(sample_restaurant):
         with patch("app.db.mongo.connect", new_callable=AsyncMock), \
              patch("app.db.mongo.disconnect", new_callable=AsyncMock):
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-                response = await client.get("/api/v1/restaurants/64b8f1c2e4b0a1234567890a")
+                response = await client.get("/api/restaurants/64b8f1c2e4b0a1234567890a")
     finally:
         app.dependency_overrides.clear()
 
@@ -221,7 +221,7 @@ async def test_get_restaurant_menu_returns_200(sample_restaurant):
         with patch("app.db.mongo.connect", new_callable=AsyncMock), \
              patch("app.db.mongo.disconnect", new_callable=AsyncMock):
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-                response = await client.get("/api/v1/restaurants/64b8f1c2e4b0a1234567890a/menu")
+                response = await client.get("/api/restaurants/64b8f1c2e4b0a1234567890a/menu")
     finally:
         app.dependency_overrides.clear()
 
@@ -248,7 +248,7 @@ async def test_get_restaurant_menu_invalid_id_returns_404():
         with patch("app.db.mongo.connect", new_callable=AsyncMock), \
              patch("app.db.mongo.disconnect", new_callable=AsyncMock):
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-                response = await client.get("/api/v1/restaurants/not-a-valid-objectid/menu")
+                response = await client.get("/api/restaurants/not-a-valid-objectid/menu")
     finally:
         app.dependency_overrides.clear()
 
@@ -276,7 +276,7 @@ async def test_add_menu_item_to_restaurant_missing_auth():
              patch("app.db.mongo.disconnect", new_callable=AsyncMock):
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 response = await client.post(
-                    "/api/v1/restaurants/64b8f1c2e4b0a1234567890a/menu",
+                    "/api/restaurants/64b8f1c2e4b0a1234567890a/menu",
                     json={"name": "Burger", "description": "Tasty", "price": 5.0},
                 )
     finally:
@@ -303,7 +303,7 @@ async def test_add_menu_item_to_restaurant_invalid_token():
              patch("app.db.mongo.disconnect", new_callable=AsyncMock):
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 response = await client.post(
-                    "/api/v1/restaurants/64b8f1c2e4b0a1234567890a/menu",
+                    "/api/restaurants/64b8f1c2e4b0a1234567890a/menu",
                     headers={"Authorization": "Bearer bad-token"},
                     json={"name": "Burger", "description": "Tasty", "price": 5.0},
                 )
@@ -331,7 +331,7 @@ async def test_add_menu_item_to_restaurant_wrong_role():
              patch("app.db.mongo.disconnect", new_callable=AsyncMock):
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 response = await client.post(
-                    "/api/v1/restaurants/64b8f1c2e4b0a1234567890a/menu",
+                    "/api/restaurants/64b8f1c2e4b0a1234567890a/menu",
                     headers={"Authorization": "Bearer customer-token"},
                     json={"name": "Burger", "description": "Tasty", "price": 5.0},
                 )
@@ -369,7 +369,7 @@ async def test_add_menu_item_to_restaurant_returns_201(sample_restaurant):
              patch("app.db.mongo.disconnect", new_callable=AsyncMock):
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 response = await client.post(
-                    "/api/v1/restaurants/64b8f1c2e4b0a1234567890a/menu",
+                    "/api/restaurants/64b8f1c2e4b0a1234567890a/menu",
                     headers={"Authorization": "Bearer valid-token"},
                     json={"name": "Cheeseburger", "description": "Classic beef patty", "price": 9.99},
                 )
@@ -401,7 +401,7 @@ async def test_add_menu_item_to_restaurant_not_found():
              patch("app.db.mongo.disconnect", new_callable=AsyncMock):
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 response = await client.post(
-                    "/api/v1/restaurants/000000000000000000000000/menu",
+                    "/api/restaurants/000000000000000000000000/menu",
                     headers={"Authorization": "Bearer valid-token"},
                     json={"name": "Burger", "description": "Tasty", "price": 5.0},
                 )
@@ -428,7 +428,7 @@ async def test_create_restaurant_returns_503_on_write_failure():
              patch("app.db.mongo.disconnect", new_callable=AsyncMock):
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 response = await client.post(
-                    "/api/v1/restaurants",
+                    "/api/restaurants",
                     json={"name": "Burger Palace", "address": "10 Main St", "cuisine": "American", "rating": 4.5},
                 )
     finally:
@@ -456,7 +456,7 @@ async def test_add_menu_item_to_restaurant_returns_503_on_write_failure(sample_r
              patch("app.db.mongo.disconnect", new_callable=AsyncMock):
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 response = await client.post(
-                    "/api/v1/restaurants/64b8f1c2e4b0a1234567890a/menu",
+                    "/api/restaurants/64b8f1c2e4b0a1234567890a/menu",
                     headers={"Authorization": "Bearer valid-token"},
                     json={"name": "Burger", "description": "Tasty", "price": 5.0},
                 )
