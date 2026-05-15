@@ -220,6 +220,7 @@ services:
       POSTGRES_URL: postgresql+asyncpg://mealmate:mealmate@postgres-orders:5432/orders
       REDIS_URL: redis://redis:6379/0
       SERVICE_INSTANCE: order-1
+      ROUTING_SERVICE_URL: http://routing:8000
     depends_on:
       postgres-orders:
         condition: service_healthy
@@ -248,6 +249,7 @@ services:
       POSTGRES_URL: postgresql+asyncpg://mealmate:mealmate@postgres-orders:5432/orders
       REDIS_URL: redis://redis:6379/0
       SERVICE_INSTANCE: order-2
+      ROUTING_SERVICE_URL: http://routing:8000
     depends_on:
       postgres-orders:
         condition: service_healthy

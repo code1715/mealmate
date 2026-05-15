@@ -393,9 +393,8 @@ dependencies = [
     { name = "uvicorn", extra = ["standard"] },
 ]
 
-[package.optional-dependencies]
-test = [
-    { name = "httpx" },
+[package.dev-dependencies]
+dev = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
 ]
@@ -406,15 +405,17 @@ requires-dist = [
     { name = "confluent-kafka", specifier = "==2.4.0" },
     { name = "fastapi", specifier = "==0.111.0" },
     { name = "httpx", specifier = "==0.27.0" },
-    { name = "httpx", marker = "extra == 'test'", specifier = "==0.27.0" },
     { name = "pydantic-settings", specifier = "==2.2.1" },
-    { name = "pytest", marker = "extra == 'test'", specifier = "==8.2.0" },
-    { name = "pytest-asyncio", marker = "extra == 'test'", specifier = "==0.23.6" },
     { name = "redis", specifier = "==5.0.4" },
     { name = "sqlalchemy", specifier = "==2.0.30" },
     { name = "uvicorn", extras = ["standard"], specifier = "==0.29.0" },
 ]
-provides-extras = ["test"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest", specifier = "==8.2.0" },
+    { name = "pytest-asyncio", specifier = "==0.23.6" },
+]
 
 [[package]]
 name = "orjson"

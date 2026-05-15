@@ -8,14 +8,21 @@ from confluent_kafka import Producer
 from app.config import settings
 from app.models.domain import VALID_TRANSITIONS, Order, OrderStatus
 from app.models.schemas import OrderCreate
+from app.services.routing_client import RoutingClient
 
 logger = logging.getLogger(__name__)
 
 
 class OrderService:
-    def __init__(self, order_repo, kafka_producer: Producer):
+    def __init__(
+        self,
+        order_repo,
+        kafka_producer: Producer,
+        routing_client: RoutingClient | None = None,
+    ):
         self.order_repo = order_repo
         self.kafka_producer = kafka_producer
+        self.routing_client = routing_client
 
     async def create_order(self, customer_id: uuid.UUID, payload: OrderCreate) -> Order:
         total = round(sum(item.quantity * item.unit_price for item in payload.items), 2)
@@ -53,11 +60,21 @@ class OrderService:
 
         updated = await self.order_repo.update_status(order_id, new_status)
 
+        # Best-effort courier assignment when restaurant starts preparing
+        if new_status == OrderStatus.PREPARING and self.routing_client is not None:
+            courier_id = await self.routing_client.assign_courier(
+                order_id=order_id,
+                restaurant_id=order.restaurant_id,
+            )
+            if courier_id is not None:
+                await self.order_repo.update_courier(order_id, courier_id)
+                updated.courier_id = courier_id
+
         self._publish_status_event(
             order_id=str(order_id),
             customer_id=str(order.customer_id),
             restaurant_id=str(order.restaurant_id),
-            courier_id=str(order.courier_id) if order.courier_id else None,
+            courier_id=str(updated.courier_id) if updated.courier_id else None,
             previous_status=current.value,
             new_status=new_status.value,
         )

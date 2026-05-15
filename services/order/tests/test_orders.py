@@ -889,3 +889,187 @@ def test_config_redis_url_uses_db_0():
 def test_config_kafka_topic_is_correct():
     """Kafka topic matches api-contracts.md."""
     assert settings.kafka_topic == "order-status-changed"
+
+
+def test_config_routing_service_url_default():
+    """Default routing_service_url points to the routing container."""
+    assert "routing" in settings.routing_service_url
+
+
+# ---------------------------------------------------------------------------
+# Tests — RoutingClient
+# ---------------------------------------------------------------------------
+
+import pytest
+import httpx
+
+from app.services.routing_client import RoutingClient
+
+
+@pytest.mark.asyncio
+async def test_routing_client_returns_courier_id_on_200():
+    """RoutingClient.assign_courier returns uuid on 200 response."""
+    order_id = uuid.uuid4()
+    restaurant_id = uuid.uuid4()
+    courier_id = uuid.uuid4()
+
+    async def handler(request):
+        return httpx.Response(
+            200,
+            json={
+                "order_id": str(order_id),
+                "courier_id": str(courier_id),
+                "estimated_minutes": 5,
+            },
+        )
+
+    transport = httpx.MockTransport(handler)
+    client = RoutingClient(base_url="http://routing:8000")
+    # Patch AsyncClient to use mock transport
+    with patch("app.services.routing_client.httpx.AsyncClient") as mock_cls:
+        mock_cls.return_value.__aenter__ = AsyncMock(
+            return_value=MagicMock(
+                post=AsyncMock(
+                    return_value=MagicMock(
+                        status_code=200,
+                        json=lambda: {
+                            "order_id": str(order_id),
+                            "courier_id": str(courier_id),
+                            "estimated_minutes": 5,
+                        },
+                    )
+                )
+            )
+        )
+        mock_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+        result = await client.assign_courier(order_id, restaurant_id)
+
+    assert result == courier_id
+
+
+@pytest.mark.asyncio
+async def test_routing_client_returns_none_on_404():
+    """RoutingClient.assign_courier returns None when no couriers available."""
+    with patch("app.services.routing_client.httpx.AsyncClient") as mock_cls:
+        mock_cls.return_value.__aenter__ = AsyncMock(
+            return_value=MagicMock(
+                post=AsyncMock(
+                    return_value=MagicMock(
+                        status_code=404,
+                        json=lambda: {"detail": "No couriers available"},
+                    )
+                )
+            )
+        )
+        mock_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+        client = RoutingClient(base_url="http://routing:8000")
+        result = await client.assign_courier(uuid.uuid4(), uuid.uuid4())
+
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_routing_client_returns_none_on_exception():
+    """RoutingClient.assign_courier swallows exceptions and returns None."""
+    with patch("app.services.routing_client.httpx.AsyncClient") as mock_cls:
+        mock_cls.return_value.__aenter__ = AsyncMock(
+            side_effect=httpx.ConnectError("connection refused")
+        )
+        mock_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+        client = RoutingClient(base_url="http://routing:8000")
+        result = await client.assign_courier(uuid.uuid4(), uuid.uuid4())
+
+    assert result is None
+
+
+# ---------------------------------------------------------------------------
+# Tests — OrderService: courier assignment on PREPARING transition
+# ---------------------------------------------------------------------------
+
+
+def _make_order_service(routing_client=None) -> OrderService:
+    """Helper: create an OrderService with pre-configured AsyncMock repo and Kafka."""
+    repo = AsyncMock()
+    return OrderService(
+        order_repo=repo,
+        kafka_producer=MagicMock(),
+        routing_client=routing_client,
+    )
+
+
+@pytest.mark.asyncio
+async def test_update_status_to_preparing_assigns_courier():
+    """When transitioning to PREPARING, courier_id is fetched and saved."""
+    courier_id = uuid.uuid4()
+    mock_routing = AsyncMock(spec=RoutingClient)
+    mock_routing.assign_courier = AsyncMock(return_value=courier_id)
+
+    order = _make_order(customer_id=CUSTOMER_ID, restaurant_id=RESTAURANT_ID, status=OrderStatus.PLACED)
+    updated = _make_order(customer_id=CUSTOMER_ID, restaurant_id=RESTAURANT_ID, status=OrderStatus.PREPARING)
+
+    svc = _make_order_service(routing_client=mock_routing)
+    svc.order_repo.find_by_id = AsyncMock(return_value=order)
+    svc.order_repo.update_status = AsyncMock(return_value=updated)
+    svc.order_repo.update_courier = AsyncMock()
+
+    result = await svc.update_status(order.id, OrderStatus.PREPARING)
+
+    mock_routing.assign_courier.assert_called_once_with(
+        order_id=order.id, restaurant_id=RESTAURANT_ID
+    )
+    svc.order_repo.update_courier.assert_called_once_with(order.id, courier_id)
+    assert result.courier_id == courier_id
+
+
+@pytest.mark.asyncio
+async def test_update_status_to_preparing_no_courier_available():
+    """When routing returns None (no couriers), order still transitions — courier_id stays null."""
+    mock_routing = AsyncMock(spec=RoutingClient)
+    mock_routing.assign_courier = AsyncMock(return_value=None)
+
+    order = _make_order(customer_id=CUSTOMER_ID, restaurant_id=RESTAURANT_ID, status=OrderStatus.PLACED)
+    updated = _make_order(customer_id=CUSTOMER_ID, restaurant_id=RESTAURANT_ID, status=OrderStatus.PREPARING)
+
+    svc = _make_order_service(routing_client=mock_routing)
+    svc.order_repo.find_by_id = AsyncMock(return_value=order)
+    svc.order_repo.update_status = AsyncMock(return_value=updated)
+    svc.order_repo.update_courier = AsyncMock()
+
+    result = await svc.update_status(order.id, OrderStatus.PREPARING)
+
+    svc.order_repo.update_courier.assert_not_called()
+    assert result.courier_id is None
+
+
+@pytest.mark.asyncio
+async def test_update_status_no_routing_client_skips_assignment():
+    """Without a routing client, status transition works but no courier is assigned."""
+    order = _make_order(status=OrderStatus.PLACED)
+    updated = _make_order(status=OrderStatus.PREPARING)
+
+    svc = _make_order_service(routing_client=None)
+    svc.order_repo.find_by_id = AsyncMock(return_value=order)
+    svc.order_repo.update_status = AsyncMock(return_value=updated)
+
+    result = await svc.update_status(order.id, OrderStatus.PREPARING)
+
+    assert result.status == OrderStatus.PREPARING
+    assert result.courier_id is None
+
+
+@pytest.mark.asyncio
+async def test_routing_not_called_for_non_preparing_transitions():
+    """Routing client is NOT called for transitions other than PLACED → PREPARING."""
+    mock_routing = AsyncMock(spec=RoutingClient)
+    mock_routing.assign_courier = AsyncMock()
+
+    order = _make_order(status=OrderStatus.PREPARING)
+    updated = _make_order(status=OrderStatus.READY)
+
+    svc = _make_order_service(routing_client=mock_routing)
+    svc.order_repo.find_by_id = AsyncMock(return_value=order)
+    svc.order_repo.update_status = AsyncMock(return_value=updated)
+
+    await svc.update_status(order.id, OrderStatus.READY)
+
+    mock_routing.assign_courier.assert_not_called()

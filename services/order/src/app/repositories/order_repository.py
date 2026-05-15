@@ -70,6 +70,14 @@ class OrderRepository:
         rows = result.scalars().all()
         return [self._row_to_domain(r) for r in rows]
 
+    async def update_courier(self, order_id, courier_id) -> None:
+        stmt = select(OrderORM).where(OrderORM.id == order_id)
+        result = await self.db.execute(stmt)
+        row = result.scalar_one_or_none()
+        if row is not None:
+            row.courier_id = courier_id
+            await self.db.flush()
+
     async def update_status(self, order_id, new_status: OrderStatus) -> Order | None:
         stmt = (
             select(OrderORM)

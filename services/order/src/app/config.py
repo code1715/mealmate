@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     # Auth Service (for token validation)
     auth_service_url: str = "http://auth:8000"
 
+    # Routing Service (for courier matching)
+    routing_service_url: str = "http://routing:8000"
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 
