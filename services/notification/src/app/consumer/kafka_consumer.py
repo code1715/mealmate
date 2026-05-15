@@ -2,12 +2,14 @@ import json
 import logging
 import time
 
-from confluent_kafka import Consumer, KafkaError, KafkaException
+from confluent_kafka import Consumer, KafkaError, KafkaException, Message
 
 from app.domain.models import OrderStatusEvent
 from app.service.notification_service import NotificationService
 
 logger = logging.getLogger(__name__)
+
+_MAX_RETRIES = 3
 
 
 class NotificationKafkaConsumer:
@@ -50,14 +52,36 @@ class NotificationKafkaConsumer:
                     logger.error("Kafka error: %s", msg.error())
                     time.sleep(5)
                     continue
-                if self._process_raw(msg.value()):
-                    consumer.commit(message=msg)
+                self._process_with_retry(msg, consumer)
         finally:
             consumer.close()
             logger.info("Kafka consumer closed")
 
     def stop(self) -> None:
         self._running = False
+
+    def _process_with_retry(self, msg: Message, consumer: Consumer) -> None:
+        value = msg.value()
+        for attempt in range(1, _MAX_RETRIES + 1):
+            if self._process_raw(value):
+                consumer.commit(message=msg)
+                return
+            if attempt < _MAX_RETRIES:
+                logger.warning(
+                    "Processing failed (attempt %d/%d) — partition=%d offset=%d",
+                    attempt,
+                    _MAX_RETRIES,
+                    msg.partition(),
+                    msg.offset(),
+                )
+        logger.error(
+            "DEAD_LETTER: message exhausted %d retries — partition=%d offset=%d raw=%s",
+            _MAX_RETRIES,
+            msg.partition(),
+            msg.offset(),
+            value[:500].decode("utf-8", errors="replace"),
+        )
+        consumer.commit(message=msg)
 
     def _process_raw(self, value: bytes) -> bool:
         try:
