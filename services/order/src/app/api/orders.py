@@ -15,6 +15,7 @@ from app.models.schemas import (
 )
 from app.repositories.order_repository import OrderRepository
 from app.services.order_service import OrderService
+from app.services.routing_client import RoutingClient
 
 router = APIRouter()
 
@@ -46,13 +47,19 @@ def get_kafka_producer() -> Producer:
     return Producer({"bootstrap.servers": settings.kafka_brokers})
 
 
+def get_routing_client() -> RoutingClient:
+    return RoutingClient(base_url=settings.routing_service_url)
+
+
 def get_order_service(
     db: AsyncSession = Depends(get_db),
     kafka_producer: Producer = Depends(get_kafka_producer),
+    routing_client: RoutingClient = Depends(get_routing_client),
 ) -> OrderService:
     return OrderService(
         order_repo=OrderRepository(db),
         kafka_producer=kafka_producer,
+        routing_client=routing_client,
     )
 
 
