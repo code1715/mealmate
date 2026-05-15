@@ -210,7 +210,8 @@ services:
       retries: 5
       start_period: 15s
 
-  order:
+  order-service-1:
+    container_name: order-service-1
     build:
       context: .
       dockerfile: docker/Dockerfile.order
@@ -219,7 +220,7 @@ services:
     environment:
       POSTGRES_URL: postgresql+asyncpg://mealmate:mealmate@postgres-orders:5432/orders
       REDIS_URL: redis://redis:6379/0
-      SERVICE_INSTANCE: order-1
+      SERVICE_INSTANCE: order-service-1
       ROUTING_SERVICE_URL: http://routing:8000
     depends_on:
       postgres-orders:
@@ -239,7 +240,8 @@ services:
       retries: 5
       start_period: 15s
 
-  order-2:
+  order-service-2:
+    container_name: order-service-2
     build:
       context: .
       dockerfile: docker/Dockerfile.order
@@ -248,7 +250,7 @@ services:
     environment:
       POSTGRES_URL: postgresql+asyncpg://mealmate:mealmate@postgres-orders:5432/orders
       REDIS_URL: redis://redis:6379/0
-      SERVICE_INSTANCE: order-2
+      SERVICE_INSTANCE: order-service-2
       ROUTING_SERVICE_URL: http://routing:8000
     depends_on:
       postgres-orders:
@@ -277,9 +279,9 @@ services:
     depends_on:
       auth:
         condition: service_healthy
-      order:
+      order-service-1:
         condition: service_healthy
-      order-2:
+      order-service-2:
         condition: service_healthy
       restaurant:
         condition: service_healthy
